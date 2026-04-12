@@ -1220,7 +1220,64 @@ function humanizeCommandName(name) {
 		.replace(/^./, (char) => char.toUpperCase());
 }
 
-function copyCommand(view) {
+async function writeToClipboard(textToCopy) {
+	try {
+		if (window.cordova?.plugins?.clipboard) {
+			await new Promise((resolve, reject) => {
+				cordova.plugins.clipboard.copy(textToCopy, resolve, reject);
+			});
+		} else if (navigator.clipboard?.writeText) {
+			await navigator.clipboard.writeText(textToCopy);
+		} else {
+			const textArea = document.createElement("textarea");
+			textArea.value = textToCopy;
+			document.body.appendChild(textArea);
+			textArea.select();
+			document.execCommand("copy");
+			document.body.removeChild(textArea);
+		}
+		toast?.(strings?.["copied to clipboard"] || "Copied to clipboard");
+		return true;
+	} catch (error) {
+		console.error("Clipboard write error:", error);
+		if (navigator.clipboard?.writeText) {
+			try {
+				await navigator.clipboard.writeText(textToCopy);
+				toast?.(strings?.["copied to clipboard"] || "Copied to clipboard");
+				return true;
+			} catch (e) {
+				console.error("Fallback clipboard write also failed:", e);
+			}
+		}
+		toast?.("Failed to copy to clipboard");
+		return false;
+	}
+}
+
+async function readFromClipboard() {
+	try {
+		if (window.cordova?.plugins?.clipboard) {
+			return await new Promise((resolve, reject) => {
+				cordova.plugins.clipboard.paste((text) => resolve(text || ""), reject);
+			});
+		} else if (navigator.clipboard?.readText) {
+			return await navigator.clipboard.readText();
+		}
+		return "";
+	} catch (error) {
+		console.error("Clipboard read error:", error);
+		if (navigator.clipboard?.readText) {
+			try {
+				return await navigator.clipboard.readText();
+			} catch (e) {
+				console.error("Fallback clipboard read also failed:", e);
+			}
+		}
+		return "";
+	}
+}
+
+async function copyCommand(view) {
 	const resolvedView = resolveView(view);
 	if (!resolvedView) return false;
 	const { state } = resolvedView;
@@ -1232,12 +1289,11 @@ function copyCommand(view) {
 		return state.doc.sliceString(range.from, range.to);
 	});
 	const textToCopy = texts.join("\n");
-	cordova.plugins.clipboard.copy(textToCopy);
-	toast?.(strings?.["copied to clipboard"] || "Copied to clipboard");
+	await writeToClipboard(textToCopy);
 	return true;
 }
 
-function cutCommand(view) {
+async function cutCommand(view) {
 	const resolvedView = resolveView(view);
 	if (!resolvedView) return false;
 	const { state } = resolvedView;
@@ -1254,28 +1310,30 @@ function cutCommand(view) {
 		segments.push(state.doc.sliceString(range.from, range.to));
 		changes.push({ from: range.from, to: range.to, insert: "" });
 	});
-	cordova.plugins.clipboard.copy(segments.join("\n"));
+	
 	resolvedView.dispatch({
 		changes,
 		selection: EditorSelection.single(
 			changes[0]?.from ?? state.selection.main.from,
 		),
 	});
+	await writeToClipboard(segments.join("\n"));
 	return true;
 }
 
-function pasteCommand(view) {
+async function pasteCommand(view) {
 	const resolvedView = resolveView(view);
 	if (!resolvedView) return false;
-	cordova.plugins.clipboard.paste((text = "") => {
-		const insertText = String(text);
-		resolvedView.dispatch(
-			resolvedView.state.changeByRange((range) => ({
-				changes: { from: range.from, to: range.to, insert: insertText },
-				range: EditorSelection.cursor(range.from + insertText.length),
-			})),
-		);
-	});
+	
+	const text = await readFromClipboard();
+	const insertText = String(text || "");
+	
+	resolvedView.dispatch(
+		resolvedView.state.changeByRange((range) => ({
+			changes: { from: range.from, to: range.to, insert: insertText },
+			range: EditorSelection.cursor(range.from + insertText.length),
+		})),
+	);
 	return true;
 }
 
