@@ -56,6 +56,56 @@ export const webServers: LspServerManifest[] = [
 		},
 		enabled: true,
 	}),
+	defineServer({
+		id: "tailwindcss",
+		label: "Tailwind CSS",
+		languages: [
+			"html",
+			"htmlembedded",
+			"javascript",
+			"javascriptreact",
+			"typescript",
+			"typescriptreact",
+			"vue",
+			"svelte",
+			"jsx",
+			"tsx",
+		],
+		command: "tailwindcss-language-server",
+		args: ["--stdio"],
+		checkCommand: "which tailwindcss-language-server",
+		installer: installers.npm({
+			executable: "tailwindcss-language-server",
+			packages: ["@tailwindcss/language-server"],
+		}),
+		clientConfig: {
+			builtinExtensions: {
+				keymaps: false,
+			},
+		},
+		enabled: true,
+		initializationOptions: {
+			userLanguages: {
+				"html-eex": "html",
+				"html.handlebars": "html",
+				"html.erb": "html",
+				"html.razor": "html",
+				"html.template": "html",
+				"html.php": "html",
+				"html.jsp": "html",
+				"html.gsp": "html",
+				"html.hbs": "html",
+				"html.vb": "html",
+				"html.twig": "html",
+				"html.jinja": "html",
+				"html.liquid": "html",
+				"html.cfml": "html",
+				"html.django": "html",
+				"html.heex": "html",
+				"html.edge": "html",
+			},
+		},
+	}),
 ];
 
 export const webBundle: LspServerBundle = defineBundle({
